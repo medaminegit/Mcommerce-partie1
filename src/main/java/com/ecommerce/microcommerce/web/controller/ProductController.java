@@ -2,6 +2,7 @@ package com.ecommerce.microcommerce.web.controller;
 
 import com.ecommerce.microcommerce.dao.ProductDao;
 import com.ecommerce.microcommerce.model.Product;
+import com.ecommerce.microcommerce.web.exceptions.ProduitGratuitException;
 import com.ecommerce.microcommerce.web.exceptions.ProduitIntrouvableException;
 import com.fasterxml.jackson.databind.ser.FilterProvider;
 import com.fasterxml.jackson.databind.ser.impl.SimpleBeanPropertyFilter;
@@ -9,6 +10,8 @@ import com.fasterxml.jackson.databind.ser.impl.SimpleFilterProvider;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.Sort.Direction;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.json.MappingJacksonValue;
 import org.springframework.web.bind.annotation.*;
@@ -16,7 +19,9 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import javax.validation.Valid;
 import java.net.URI;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 
 @Api( description="API pour es opérations CRUD sur les produits.")
@@ -67,23 +72,30 @@ public class ProductController {
     //ajouter un produit
     @PostMapping(value = "/Produits")
 
-    public ResponseEntity<Void> ajouterProduit(@Valid @RequestBody Product product) {
+    public ResponseEntity<Void> ajouterProduit(@Valid@RequestBody Product product) throws ProduitGratuitException  {
 
-        Product productAdded =  productDao.save(product);
-
-        if (productAdded == null)
+        
+        if (product == null)
             return ResponseEntity.noContent().build();
-
-        URI location = ServletUriComponentsBuilder
+         if(product.getPrix()!=0)
+        {        	
+        	 	Product productAdded =  productDao.save(product);
+             	URI location = ServletUriComponentsBuilder
                 .fromCurrentRequest()
                 .path("/{id}")
                 .buildAndExpand(productAdded.getId())
                 .toUri();
 
-        return ResponseEntity.created(location).build();
+        		return ResponseEntity.created(location).build();
+        }
+        if(product.getPrix()==0) throw new ProduitGratuitException("le prix de vente ne doit pas être egale à 0");
+    	return ResponseEntity.badRequest().build();
     }
 
-    @DeleteMapping (value = "/Produits/{id}")
+   
+
+
+	@DeleteMapping (value = "/Produits/{id}")
     public void supprimerProduit(@PathVariable int id) {
 
         productDao.delete(id);
@@ -103,6 +115,18 @@ public class ProductController {
         return productDao.chercherUnProduitCher(400);
     }
 
-
+    @RequestMapping(value="/AdminProduits", method = RequestMethod.GET)
+    public Map<Product,Integer> calculerMargeProduit (){
+    	List<Product> produits=productDao.findAll();
+    	Map <Product,Integer> Prd_clc=new HashMap<Product, Integer>();
+    	for(Product pr:produits)
+    		Prd_clc.put(pr, pr.getPrix()-pr.getPrixAchat());
+    	return Prd_clc;
+    }
+    @GetMapping(value="/TrierParNom")
+    public List<Product>trierProduitsParOrdreAlphabetique (){
+    	return productDao.findAll(new Sort(Direction.ASC,"nom"));
+    	
+    }
 
 }
